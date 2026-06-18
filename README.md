@@ -1,19 +1,21 @@
 # vastline
 
+[![CI](https://github.com/Entrolution/vastline/actions/workflows/ci.yml/badge.svg)](https://github.com/Entrolution/vastline/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Entrolution/vastline?logo=github&color=2ea44f)](https://github.com/Entrolution/vastline/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Platforms](https://img.shields.io/badge/platforms-macOS%20%C2%B7%20Linux%20%C2%B7%20Windows-555)
+![Rust](https://img.shields.io/badge/rust-stdlib%20%2B%20serde-dea584?logo=rust)
+
 A Claude Code **status line** for [vast.ai](https://vast.ai) GPU usage. It shows how many
 instances are up, your **running compute** vs **stopped-storage** burn, your account balance, and
 how long that balance lasts at the total burn — as one extra line under whatever status line you
 already run (e.g. [quotaline](https://github.com/Entrolution/quotaline)).
 
-```
-Opus · effort: high · ctx 12% (98k)        ← quotaline (delegated to, unchanged)
-5h  ███████░░░░  68%  2h05m                 ← quotaline
-wk  ████░░░░░░░  41%  3d4h                  ← quotaline
-vast  1/2 up · run $0.57/hr · store $0.01/hr · bal $15.62 · ~27h   ← vastline
-```
+![vastline status line — quotaline's model/effort/ctx/mem header and 5-hour and weekly usage bars, then a vast line showing running/total instances, running compute burn, stopped-instance storage burn, account balance, and the runway until the balance runs out](assets/demo.svg)
 
-It reads only two vast.ai endpoints with a **read-only scoped key**, and does it off the render
-path so your prompt never blocks on the network.
+The bottom line is vastline; the lines above it are quotaline, which vastline delegates to and
+leaves untouched. It reads only two vast.ai endpoints with a **read-only scoped key**, and does
+it off the render path so your prompt never blocks on the network.
 
 ## What it shows
 
