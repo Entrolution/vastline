@@ -94,13 +94,20 @@ fn status() -> i32 {
                 Ok(s) => {
                     println!("ok");
                     println!("  instances:    {} running / {} total", s.running, s.total);
-                    println!("  burn running: {}", fmt::fmt_rate(s.burn_running));
-                    println!("  burn total:   {}", fmt::fmt_rate(s.burn_all));
+                    println!(
+                        "  burn running: {} (running compute)",
+                        fmt::fmt_rate(s.burn_running)
+                    );
+                    println!(
+                        "  burn stopped: {} (storage on stopped instances)",
+                        fmt::fmt_rate(s.burn_stopped)
+                    );
+                    println!("  burn total:   {}", fmt::fmt_rate(s.burn_total()));
                     match s.balance {
                         Some(b) => println!("  balance:      {}", fmt::fmt_money(b)),
                         None => println!("  balance:      (not returned — check user_read scope)"),
                     }
-                    if let Some(h) = burn::runway_hours(s.balance, s.burn_all) {
+                    if let Some(h) = burn::runway_hours(s.balance, s.burn_total()) {
                         println!("  runway:       ~{} at total burn", fmt::fmt_hours(h));
                     }
                     0

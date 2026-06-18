@@ -52,8 +52,9 @@ pub struct State {
     pub total: u32,
     #[serde(default)]
     pub burn_running: f64,
+    /// Storage-only $/hr over stopped instances (see `api::Snapshot::burn_stopped`).
     #[serde(default)]
-    pub burn_all: f64,
+    pub burn_stopped: f64,
     #[serde(default)]
     pub balance: Option<f64>,
 }
@@ -68,9 +69,14 @@ impl State {
             running: s.running,
             total: s.total,
             burn_running: s.burn_running,
-            burn_all: s.burn_all,
+            burn_stopped: s.burn_stopped,
             balance: s.balance,
         }
+    }
+
+    /// Total $/hr draining the balance now: running compute + stopped storage.
+    pub fn burn_total(&self) -> f64 {
+        self.burn_running + self.burn_stopped
     }
 
     /// Age of the last *successful* data in seconds relative to `now` (never negative).
@@ -129,7 +135,7 @@ pub fn write_error(dir: &Path, message: &str, now: f64) {
         running: 0,
         total: 0,
         burn_running: 0.0,
-        burn_all: 0.0,
+        burn_stopped: 0.0,
         balance: None,
     });
     state.ok = false;

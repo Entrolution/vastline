@@ -1,15 +1,15 @@
 # vastline
 
 A Claude Code **status line** for [vast.ai](https://vast.ai) GPU usage. It shows how many
-instances are up, your **running** vs **total** burn rate, your account balance, and how long
-that balance lasts at the current burn — as one extra line under whatever status line you
+instances are up, your **running compute** vs **stopped-storage** burn, your account balance, and
+how long that balance lasts at the total burn — as one extra line under whatever status line you
 already run (e.g. [quotaline](https://github.com/Entrolution/quotaline)).
 
 ```
 Opus · effort: high · ctx 12% (98k)        ← quotaline (delegated to, unchanged)
 5h  ███████░░░░  68%  2h05m                 ← quotaline
 wk  ████░░░░░░░  41%  3d4h                  ← quotaline
-vast  2/3 up · run $1.84/hr · all $1.89/hr · bal $47.20 · ~25h   ← vastline
+vast  1/2 up · run $0.57/hr · store $0.01/hr · bal $15.62 · ~27h   ← vastline
 ```
 
 It reads only two vast.ai endpoints with a **read-only scoped key**, and does it off the render
@@ -17,26 +17,29 @@ path so your prompt never blocks on the network.
 
 ## What it shows
 
-- **`2/3 up`** — running instances / total instances.
-- **`run $1.84/hr`** — burn rate of the instances that are actually *running* (compute + their
-  storage).
-- **`all $1.89/hr`** — burn rate across *all* instances, **including storage still billing on
-  stopped instances**. Shown only when it differs from running burn (i.e. you have stopped-but-
-  not-destroyed instances quietly costing money).
-- **`bal $47.20`** — account credit (red if ≤ 0).
-- **`~25h`** — runway: how long the balance lasts at the **total** burn rate. Amber under 12h,
-  red under 4h. Computed from *total* burn deliberately — an idle fleet still bleeds storage,
-  and a runway based on running burn alone would read as falsely infinite while money leaks.
+- **`1/2 up`** — running instances / total instances.
+- **`run $0.57/hr`** — burn rate of the instances that are actually *running* (`dph_total`, which
+  already includes their storage). Shown only when something is running.
+- **`store $0.01/hr`** — storage still billing on *stopped-but-not-destroyed* instances. Shown
+  only when it's non-zero (you have stopped instances quietly costing storage).
+- **`bal $15.62`** — account credit (red if ≤ 0).
+- **`~27h`** — runway: how long the balance lasts at the **total** burn (running + storage).
+  Amber under 12h, red under 4h. Computed from total burn deliberately — a stopped fleet still
+  bleeds storage, so a runway based on running burn alone would read as falsely infinite.
 
-Degrades quietly: no key → a one-line setup hint; an empty fleet → `vast  idle · bal $47.20`;
-a stale or failed refresh → the last good numbers, dimmed, with a marker.
+Degrades quietly: no key → a one-line setup hint; an empty fleet → `vast  idle · bal $15.62`;
+everything stopped → `vast  0/1 up · store $0.01/hr · bal $15.62 · ~73d`; a stale or failed
+refresh → the last good numbers, dimmed, with a marker.
 
-## Why running vs total burn are both shown
+## Why running and storage burn are shown separately
 
-vast.ai bills storage even when an instance is *stopped*. So "what am I spending right now on
-compute" (running burn) and "what is actually draining my wallet" (total burn) are different
-numbers, and conflating them hides idle storage cost. vastline shows both and bases the runway
-on the honest one.
+vast.ai keeps an instance's `dph_total` (its full per-hour compute rate) reported even after you
+**stop** it — but a stopped instance is only billed for *storage*, which is dramatically cheaper
+(an A100 at `$0.57/hr` running drops to `~$0.01/hr` of disk when stopped). Summing `dph_total`
+across all instances would therefore massively overstate the drain of a stopped fleet and report
+a runway of hours when it's really weeks. So vastline bills running instances at `dph_total` and
+stopped instances at their storage rate (`storage_total_cost`), shows the two components
+separately, and computes the runway from their honest sum.
 
 ## Install
 

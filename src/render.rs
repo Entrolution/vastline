@@ -2,11 +2,12 @@
 //! the output of the *base* status-line command we delegate to — see `install.rs`. This is what
 //! lets vastline sit "on top of" quotaline without either tool knowing about the other.
 //!
-//! Example line (running and total burn shown independently, runway from total):
-//!   vast  2/3 up · run $1.84/hr · all $1.89/hr · bal $47.20 · ~25h
+//! Example line (running compute and stopped-storage burn shown as separate components, runway
+//! from their total):
+//!   vast  1/2 up · run $0.57/hr · store $0.01/hr · bal $47.20 · ~25h
 //!
 //! Degrades gracefully: no key → a one-line hint; stale/failed fetch → dimmed with a marker;
-//! empty fleet → `vast  idle · bal $47.20`.
+//! empty fleet → `vast  idle · bal $47.20`; everything stopped → `vast  0/1 up · store $0.01/hr …`.
 
 use std::io::Read;
 use std::process::{Command, Stdio};
@@ -120,11 +121,14 @@ pub fn line(state: Option<&State>, now: f64) -> String {
         segs.push(format!("{GREEN}idle{RESET}"));
     } else {
         segs.push(format!("{}/{} up", s.running, s.total));
-        segs.push(format!("{DIM}run{RESET} {}", fmt_rate(s.burn_running)));
-        // Only show total burn separately when it differs from running (i.e. stopped instances
-        // are still billing storage) — otherwise it's noise.
-        if (s.burn_all - s.burn_running).abs() > 5e-3 {
-            segs.push(format!("{DIM}all{RESET} {}", fmt_rate(s.burn_all)));
+        // Running compute burn (includes those instances' storage), shown only when something runs.
+        if s.running > 0 {
+            segs.push(format!("{DIM}run{RESET} {}", fmt_rate(s.burn_running)));
+        }
+        // Storage still billing on stopped-but-not-destroyed instances — a separate, much smaller
+        // drain. `dph_total` stays at the full rate when stopped, so this is computed from storage.
+        if s.burn_stopped > 5e-4 {
+            segs.push(format!("{DIM}store{RESET} {}", fmt_rate(s.burn_stopped)));
         }
     }
 
@@ -136,8 +140,8 @@ pub fn line(state: Option<&State>, now: f64) -> String {
         ));
     }
 
-    // Runway from TOTAL burn — the number that actually drains the wallet.
-    if let Some(hrs) = runway_hours(s.balance, s.burn_all) {
+    // Runway from the TOTAL drain (running + stopped storage) — what actually empties the wallet.
+    if let Some(hrs) = runway_hours(s.balance, s.burn_total()) {
         segs.push(format!(
             "{}~{}{RESET}",
             runway_color(Some(hrs)),
@@ -179,7 +183,7 @@ mod tests {
         out
     }
 
-    fn state(running: u32, total: u32, run: f64, all: f64, bal: Option<f64>) -> State {
+    fn state(running: u32, total: u32, run: f64, stopped: f64, bal: Option<f64>) -> State {
         State {
             fetched_at: 1000.0,
             last_attempt: 1000.0,
@@ -188,29 +192,41 @@ mod tests {
             running,
             total,
             burn_running: run,
-            burn_all: all,
+            burn_stopped: stopped,
             balance: bal,
         }
     }
 
     #[test]
-    fn full_line_running_and_total_burn() {
-        let s = state(2, 3, 1.84, 1.89, Some(47.20));
+    fn all_running_shows_run_and_runway_from_total() {
+        // 1 A100 up: store burn is 0, runway from running burn alone.
+        let s = state(1, 1, 0.57, 0.0, Some(15.63));
         let got = strip(&line(Some(&s), 1010.0));
-        assert_eq!(
-            got,
-            "vast  2/3 up · run $1.84/hr · all $1.89/hr · bal $47.20 · ~25h"
-        );
+        assert_eq!(got, "vast  1/1 up · run $0.57/hr · bal $15.63 · ~27h");
     }
 
     #[test]
-    fn total_burn_hidden_when_equal_to_running() {
-        let s = state(1, 1, 0.50, 0.50, Some(10.0));
+    fn stopped_instance_shows_storage_not_compute() {
+        // The live-tested case: instance stopped → no compute burn, only tiny storage, long runway.
+        let s = state(0, 1, 0.0, 0.0089, Some(15.62));
         let got = strip(&line(Some(&s), 1010.0));
-        assert!(got.contains("run $0.50/hr"));
+        assert!(got.contains("0/1 up"), "{got}");
         assert!(
-            !got.contains("all "),
-            "should hide redundant total burn: {got}"
+            !got.contains("run "),
+            "no compute burn when nothing runs: {got}"
+        );
+        assert!(got.contains("store $0.01/hr"), "{got}");
+        // 15.62 / 0.0089 ≈ 1755h ≈ 73 days — not the misleading ~27h.
+        assert!(got.contains("~73d"), "{got}");
+    }
+
+    #[test]
+    fn mixed_fleet_shows_both_components() {
+        let s = state(1, 2, 0.57, 0.0089, Some(15.62));
+        let got = strip(&line(Some(&s), 1010.0));
+        assert!(
+            got.contains("1/2 up · run $0.57/hr · store $0.01/hr"),
+            "{got}"
         );
     }
 
