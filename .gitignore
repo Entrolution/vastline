@@ -1,0 +1,12 @@
+# Per-machine runtime cache + any stored credential — never commit
+.state/
+vast_api_key
+
+# Claude Code workspace
+.claude/
+
+# Rust build output (Cargo.lock IS committed — this is a binary)
+/target/
+
+# OS cruft
+.DS_Store
