@@ -55,7 +55,10 @@ case ":$PATH:" in
   *) echo; echo "note: $INSTALL_DIR is not on your PATH — add it to run 'vastline' commands directly." ;;
 esac
 
-echo
-echo "next: add a read-only API key —"
-echo "  vastai create api-key --name vastline --permissions '{\"api\": {\"instance_read\": {}, \"user_read\": {}}}'"
-echo "  $INSTALL_DIR/vastline key set"
+# Only nudge about a key if one isn't already resolvable (env, vastline's config, or the vast CLI).
+if ! "$INSTALL_DIR/vastline" key path >/dev/null 2>&1; then
+  echo
+  echo "next: add a read-only API key —"
+  echo "  vastai create api-key --name vastline --permissions '{\"api\": {\"instance_read\": {}, \"user_read\": {}}}'"
+  echo "  $INSTALL_DIR/vastline key set"
+fi

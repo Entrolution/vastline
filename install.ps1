@@ -34,7 +34,11 @@ if (-not $onPath) {
     Write-Host "      or use the full path: $exe"
 }
 
-Write-Host ""
-Write-Host "next: add a read-only API key —"
-Write-Host "  vastai create api-key --name vastline --permissions '{\"api\": {\"instance_read\": {}, \"user_read\": {}}}'"
-Write-Host "  $exe key set"
+# Only nudge about a key if one isn't already resolvable (env, vastline's config, or the vast CLI).
+& $exe key path *> $null
+if ($LASTEXITCODE -ne 0) {
+    Write-Host ""
+    Write-Host "next: add a read-only API key —"
+    Write-Host "  vastai create api-key --name vastline --permissions '{\"api\": {\"instance_read\": {}, \"user_read\": {}}}'"
+    Write-Host "  $exe key set"
+}
